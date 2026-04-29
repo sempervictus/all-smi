@@ -601,6 +601,75 @@ fn create_device_detail(
     // VBIOS version
     add_detail!(detail, device.vbios_version(), "vbios_version");
 
+    // Fan speed - requires fan index, use 0 for single-fan GPUs
+    if let Ok(fan_speed) = device.fan_speed(0) {
+        detail.insert("fan_speed_percent".to_string(), format!("{}", fan_speed));
+    }
+
+    // PCIe RX/TX bytes (cumulative counters)
+    // Use pcie_throughput with Send/Receive counters
+    if let Ok(pcie_tx) = device.pcie_throughput(nvml_wrapper::enum_wrappers::device::PcieUtilCounter::Send) {
+        detail.insert("pcie_tx_bytes".to_string(), format!("{}", pcie_tx));
+    }
+    if let Ok(pcie_rx) = device.pcie_throughput(nvml_wrapper::enum_wrappers::device::PcieUtilCounter::Receive) {
+        detail.insert("pcie_rx_bytes".to_string(), format!("{}", pcie_rx));
+    }
+
+    // SM clock (current)
+    if let Ok(sm_clock) = device.clock(nvml_wrapper::enum_wrappers::device::Clock::SM, nvml_wrapper::enum_wrappers::device::ClockId::Current) {
+        detail.insert("sm_clock".to_string(), format!("{}", sm_clock));
+    }
+
+    // Graphics clock (current)
+    if let Ok(graphics_clock) = device.clock(nvml_wrapper::enum_wrappers::device::Clock::Graphics, nvml_wrapper::enum_wrappers::device::ClockId::Current) {
+        detail.insert("graphics_clock".to_string(), format!("{}", graphics_clock));
+    }
+
+    // Memory clock (current)
+    if let Ok(mem_clock) = device.clock(nvml_wrapper::enum_wrappers::device::Clock::Memory, nvml_wrapper::enum_wrappers::device::ClockId::Current) {
+        detail.insert("mem_clock".to_string(), format!("{}", mem_clock));
+    }
+
+    // Memory bus width
+    if let Ok(mem_bus_width) = device.memory_bus_width() {
+        detail.insert("memory_bus_width".to_string(), format!("{}", mem_bus_width));
+    }
+
+    // Encoder utilization
+    if let Ok(encoder_util) = device.encoder_utilization() {
+        detail.insert("encoder_utilization".to_string(), format!("{}", encoder_util.utilization));
+    }
+
+    // Decoder utilization
+    if let Ok(decoder_util) = device.decoder_utilization() {
+        detail.insert("decoder_utilization".to_string(), format!("{}", decoder_util.utilization));
+    }
+
+    // ECC single-bit errors (total correctable errors)
+    if let Ok(ecc_errors) = device.total_ecc_errors(
+        nvml_wrapper::enum_wrappers::device::MemoryError::Corrected,
+        nvml_wrapper::enum_wrappers::device::EccCounter::Volatile,
+    ) {
+        detail.insert("ecc_errors_single_bit".to_string(), format!("{}", ecc_errors));
+    }
+    // ECC double-bit errors (total uncorrectable errors)
+    if let Ok(ecc_errors) = device.total_ecc_errors(
+        nvml_wrapper::enum_wrappers::device::MemoryError::Uncorrected,
+        nvml_wrapper::enum_wrappers::device::EccCounter::Volatile,
+    ) {
+        detail.insert("ecc_errors_double_bit".to_string(), format!("{}", ecc_errors));
+    }
+
+    // Compute processes count
+    if let Ok(compute_procs) = device.running_compute_processes() {
+        detail.insert("compute_processes".to_string(), format!("{}", compute_procs.len()));
+    }
+
+    // Graphics processes count
+    if let Ok(graphics_procs) = device.running_graphics_processes() {
+        detail.insert("graphics_processes".to_string(), format!("{}", graphics_procs.len()));
+    }
+
     detail
 }
 
