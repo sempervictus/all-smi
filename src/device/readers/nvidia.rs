@@ -559,6 +559,22 @@ fn create_device_detail(
         device.max_customer_boost_clock(Clock::Memory),
         "clock_memory_max"
     );
+    // Also add max_clock_info for SM and Graphics
+    add_detail!(
+        detail,
+        device.max_clock_info(Clock::Graphics),
+        "clock_graphics_max_info"
+    );
+    add_detail!(
+        detail,
+        device.max_clock_info(Clock::SM),
+        "clock_sm_max"
+    );
+    add_detail!(
+        detail,
+        device.max_clock_info(Clock::Memory),
+        "clock_memory_max_info"
+    );
 
     // ECC mode
     if let Ok(ecc_enabled) = device.is_ecc_enabled() {
@@ -671,8 +687,12 @@ fn create_device_detail(
     }
 
     // SM count - number of streaming multiprocessors
-    if let Ok(sm_count) = device.num_cores() {
-        detail.insert("sm_count".to_string(), format!("{}", sm_count));
+    // Use attributes() to get multiprocessor_count instead of num_cores (which returns CUDA cores)
+    if let Ok(attrs) = device.attributes() {
+        detail.insert("sm_count".to_string(), format!("{}", attrs.multiprocessor_count));
+    } else if let Ok(sm_count) = device.num_cores() {
+        // Fallback: calculate SM count from CUDA cores (typically 128 cores per SM)
+        detail.insert("sm_count".to_string(), format!("{}", sm_count / 128));
     }
     
     // Warp size - typically 32 for NVIDIA GPUs
