@@ -670,6 +670,24 @@ fn create_device_detail(
         detail.insert("graphics_processes".to_string(), format!("{}", graphics_procs.len()));
     }
 
+    // SM count - number of streaming multiprocessors
+    if let Ok(sm_count) = device.num_cores() {
+        detail.insert("sm_count".to_string(), format!("{}", sm_count));
+    }
+    
+    // Warp size - typically 32 for NVIDIA GPUs
+    // This is a hardware constant, not a runtime value
+    detail.insert("warp_size".to_string(), "32".to_string());
+    
+    // Memory bandwidth - calculated from bus width and clock speed
+    if let Ok(mem_bus_width) = device.memory_bus_width() {
+        if let Ok(mem_clock) = device.clock(nvml_wrapper::enum_wrappers::device::Clock::Memory, nvml_wrapper::enum_wrappers::device::ClockId::Current) {
+            // Memory bandwidth = bus_width * clock_speed * 2 (for DDR) / 8 (to bytes)
+            let bandwidth = (mem_bus_width as u64) * (mem_clock as u64) * 2 / 8;
+            detail.insert("memory_bandwidth_bytes_per_second".to_string(), format!("{}", bandwidth));
+        }
+    }
+    
     detail
 }
 
