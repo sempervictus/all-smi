@@ -234,19 +234,20 @@ impl NvidiaGpuReader {
                          warp_size: 32, // Hardware constant for NVIDIA GPUs
                          memory_bus_width_bits: device.memory_bus_width().unwrap_or(0),
                          memory_bandwidth_bytes_per_second: device
-                             .memory_bus_width()
-                             .ok()
-                             .and_then(|bus_width| {
-                                 device.clock(
-                                     nvml_wrapper::enum_wrappers::device::Clock::Memory,
-                                     nvml_wrapper::enum_wrappers::device::ClockId::Current,
-                                 )
-                                 .ok()
-                                 .map(|mem_clock| {
-                                     (bus_width as u64) * (mem_clock as u64) * 2 / 8
-                                 })
-                             })
-                             .unwrap_or(0),
+                              .memory_bus_width()
+                              .ok()
+                              .and_then(|bus_width| {
+                                  device.clock(
+                                      nvml_wrapper::enum_wrappers::device::Clock::Memory,
+                                      nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                                  )
+                                  .ok()
+                                  .map(|mem_clock| {
+                                      (bus_width as u64) * (mem_clock as u64) * 2 / 8
+                                  })
+                              })
+                              .map(|bw| bw as f64)
+                              .unwrap_or(0.0),
                      };
                     gpu_info.push(info);
                 }
@@ -785,26 +786,38 @@ fn get_gpu_info_nvidia_smi() -> Vec<GpuInfo> {
                 }
 
                 Some(GpuInfo {
-                    uuid: parts[1].to_string(),
-                    time: time.clone(),
-                    name: parts[2].to_string(),
-                    device_type: "GPU".to_string(),
-                    host_id: hostname.clone(),
-                    hostname: hostname.clone(),
-                    instance: hostname.clone(),
-                    utilization: parts[3].parse().unwrap_or(0.0),
-                    ane_utilization: 0.0,
-                    dla_utilization: None,
-                    tensorcore_utilization: None,
-                    temperature: parts[4].parse().unwrap_or(0),
-                    used_memory,
-                    total_memory,
-                    frequency: parts[7].parse().unwrap_or(0),
-                    power_consumption: parts[8].replace("[N/A]", "0").parse::<f64>().unwrap_or(0.0)
-                        / 1000.0,
-                    gpu_core_count: None,
-                    detail,
-                })
+                     uuid: parts[1].to_string(),
+                     time: time.clone(),
+                     name: parts[2].to_string(),
+                     device_type: "GPU".to_string(),
+                     host_id: hostname.clone(),
+                     hostname: hostname.clone(),
+                     instance: hostname.clone(),
+                     utilization: parts[3].parse().unwrap_or(0.0),
+                     ane_utilization: 0.0,
+                     dla_utilization: None,
+                     tensorcore_utilization: None,
+                     temperature: parts[4].parse().unwrap_or(0),
+                     used_memory,
+                     total_memory,
+                     frequency: parts[7].parse().unwrap_or(0),
+                     power_consumption: parts[8].replace("[N/A]", "0").parse::<f64>().unwrap_or(0.0)
+                         / 1000.0,
+                     gpu_core_count: None,
+                     detail,
+                     // New fields - nvidia-smi fallback provides defaults
+                     pci_bus_id: format!("0000:{:02x}:00.0", idx),
+                     thermal_threshold_shutdown_c: 100,
+                     thermal_threshold_slowdown_c: 85,
+                     power_limit_w: 350.0,
+                     power_limit_default_w: 350.0,
+                     pcie_max_gen: 4,
+                     pcie_max_width: 16,
+                     sm_count: 0,
+                     warp_size: 32,
+                     memory_bus_width_bits: 0,
+                     memory_bandwidth_bytes_per_second: 0.0,
+                 })
             } else {
                 None
             }
