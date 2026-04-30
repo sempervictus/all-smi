@@ -22,6 +22,7 @@ use libamdgpu_top::stat::{self, FdInfoStat, ProcInfo};
 use libamdgpu_top::{AppDeviceInfo, DevicePath, VramUsage};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // GPU metric validation constants
 const MAX_GPU_UTILIZATION: f64 = 100.0; // Maximum utilization percentage
@@ -531,9 +532,15 @@ impl GpuReader for AmdGpuReader {
                 gsp_firmware_mode: None,
                 gsp_firmware_version: None,
                 nvlink_remote_devices: Vec::new(),
-                gpm_metrics: None,
-            };
-            gpu_info.push(info);
+                 gpm_metrics: None,
+                 // PCIe rate fields - not available for AMD via libamdgpu_top
+                 pcie_rx_bytes: None,
+                 pcie_tx_bytes: None,
+                 pcie_rx_rate_bps: None,
+                 pcie_tx_rate_bps: None,
+                 pcie_sample_time_ns: None,
+             };
+             gpu_info.push(info);
         }
 
         gpu_info

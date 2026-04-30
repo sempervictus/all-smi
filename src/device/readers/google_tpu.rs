@@ -991,8 +991,14 @@ fn create_gpu_info_from_device(
         gsp_firmware_mode: None,
         gsp_firmware_version: None,
         nvlink_remote_devices: Vec::new(),
-        gpm_metrics: None,
-    })
+         gpm_metrics: None,
+         // PCIe rate fields - not available for TPU
+         pcie_rx_bytes: None,
+         pcie_tx_bytes: None,
+         pcie_rx_rate_bps: None,
+         pcie_tx_rate_bps: None,
+         pcie_sample_time_ns: None,
+     })
 }
 
 #[cfg(all(test, target_os = "linux"))]

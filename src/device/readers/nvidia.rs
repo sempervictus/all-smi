@@ -25,9 +25,37 @@ use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::{Nvml, cuda_driver_version_major, cuda_driver_version_minor};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // Global status for NVML error messages
 static NVML_STATUS: Mutex<Option<String>> = Mutex::new(None);
+
+/// Get current time in nanoseconds for PCIe rate calculation
+fn get_time_ns() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64
+}
+
+/// Calculate PCIe rate from cumulative counters
+fn calculate_pcie_rate(
+    current_rx: u64,
+    current_tx: u64,
+    prev_rx: u64,
+    prev_tx: u64,
+    time_ns: u64,
+    prev_time_ns: u64,
+) -> (f64, f64) {
+    let time_delta_ns = time_ns.saturating_sub(prev_time_ns);
+    if time_delta_ns == 0 {
+        return (0.0, 0.0);
+    }
+    let time_delta_s = time_delta_ns as f64 / 1_000_000_000.0;
+    let rx_delta = current_rx.saturating_sub(prev_rx) as f64;
+    let tx_delta = current_tx.saturating_sub(prev_tx) as f64;
+    (rx_delta / time_delta_s, tx_delta / time_delta_s)
+}
 
 pub struct NvidiaGpuReader {
     /// Cached driver version (fetched only once)
@@ -38,6 +66,9 @@ pub struct NvidiaGpuReader {
     device_static_info: OnceLock<HashMap<u32, DeviceStaticInfo>>,
     /// Cached NVML handle (initialized once, reused across calls)
     nvml: Mutex<Option<Nvml>>,
+    /// Cached PCIe counters per device for rate calculation
+    /// (device_index, (rx_bytes, tx_bytes, timestamp_ns))
+    pcie_cache: Mutex<HashMap<u32, (u64, u64, u64)>>,
 }
 
 impl Default for NvidiaGpuReader {
@@ -53,6 +84,7 @@ impl NvidiaGpuReader {
             cuda_version: OnceLock::new(),
             device_static_info: OnceLock::new(),
             nvml: Mutex::new(Nvml::init().ok()),
+            pcie_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -148,9 +180,24 @@ impl NvidiaGpuReader {
     /// Get GPU info using NVML with cached static values
     fn get_gpu_info_nvml(&self, nvml: &Nvml) -> Vec<GpuInfo> {
         let mut gpu_info = Vec::new();
+        let current_time_ns = get_time_ns();
 
         // Get cached static device information (fetched only once)
         let device_static_info = self.get_device_static_info(nvml);
+
+        // Get current PCIe counters for rate calculation
+        let mut current_pcie_counters: HashMap<u32, (u64, u64)> = HashMap::new();
+        if let Ok(device_count) = nvml.device_count() {
+            for i in 0..device_count {
+                if let Ok(device) = nvml.device_by_index(i) {
+                    if let Ok(pcie_tx) = device.pcie_throughput(nvml_wrapper::enum_wrappers::device::PcieUtilCounter::Send) {
+                        if let Ok(pcie_rx) = device.pcie_throughput(nvml_wrapper::enum_wrappers::device::PcieUtilCounter::Receive) {
+                            current_pcie_counters.insert(i, (pcie_rx as u64, pcie_tx as u64));
+                        }
+                    }
+                }
+            }
+        }
 
         if let Ok(device_count) = nvml.device_count() {
             for i in 0..device_count {
@@ -172,6 +219,24 @@ impl NvidiaGpuReader {
                             mem_total_raw,
                             mem_info.as_ref().map(|m| m.used).unwrap_or(0),
                         )
+                    };
+
+                    // Calculate PCIe rates
+                    let (pcie_rx_rate_bps, pcie_tx_rate_bps) = {
+                        let mut pcie_cache = self.pcie_cache.lock().unwrap();
+                        let prev = pcie_cache.get(&i).cloned();
+                        let current = current_pcie_counters.get(&i).cloned().unwrap_or((0, 0));
+                        
+                        if let Some((prev_rx, prev_tx, prev_time)) = prev {
+                            let (rx_rate, tx_rate) = calculate_pcie_rate(
+                                current.0, current.1, prev_rx, prev_tx, current_time_ns, prev_time
+                            );
+                            pcie_cache.insert(i, (current.0, current.1, current_time_ns));
+                            (rx_rate, tx_rate)
+                        } else {
+                            pcie_cache.insert(i, (current.0, current.1, current_time_ns));
+                            (0.0, 0.0)
+                        }
                     };
 
                     let info = GpuInfo {
@@ -254,6 +319,12 @@ impl NvidiaGpuReader {
                           gsp_firmware_version: None,
                           nvlink_remote_devices: Vec::new(),
                           gpm_metrics: None,
+                          // PCIe rate fields
+                          pcie_rx_bytes: current_pcie_counters.get(&i).map(|(rx, _)| *rx),
+                          pcie_tx_bytes: current_pcie_counters.get(&i).map(|(_, tx)| *tx),
+                          pcie_rx_rate_bps: Some(pcie_rx_rate_bps),
+                          pcie_tx_rate_bps: Some(pcie_tx_rate_bps),
+                          pcie_sample_time_ns: Some(current_time_ns),
                       };
                      gpu_info.push(info);
                 }
@@ -332,7 +403,7 @@ fn is_uma_device_with_mem(device: &nvml_wrapper::Device, memory_total: u64) -> b
         return false;
     }
 
-    // Check architecture first (preferred — covers future Blackwell UMA products)
+    // Check architecture first (preferred - covers future Blackwell UMA products)
     if let Ok(arch) = device.architecture()
         && arch == DeviceArchitecture::Blackwell
     {
@@ -550,7 +621,7 @@ fn create_device_detail(
     let mem_total = device.memory_info().map(|m| m.total).unwrap_or(0);
     let uma = is_uma_device_with_mem(device, mem_total);
 
-    // Suppress PCIe metrics for UMA devices — they use internal interconnect
+    // Suppress PCIe metrics for UMA devices - they use internal interconnect
     if uma {
         detail.insert("Memory Type".to_string(), "Unified".to_string());
         detail.insert("Interconnect".to_string(), "Integrated".to_string());
@@ -831,6 +902,12 @@ fn get_gpu_info_nvidia_smi() -> Vec<GpuInfo> {
                         gsp_firmware_version: None,
                         nvlink_remote_devices: Vec::new(),
                         gpm_metrics: None,
+                        // PCIe rate fields - nvidia-smi doesn't provide these
+                        pcie_rx_bytes: None,
+                        pcie_tx_bytes: None,
+                        pcie_rx_rate_bps: None,
+                        pcie_tx_rate_bps: None,
+                        pcie_sample_time_ns: None,
                     })
             } else {
                 None
@@ -1063,5 +1140,32 @@ Cached:          4096000 kB
         let (total, used) = parse_meminfo_content(content);
         assert_eq!(total, 0);
         assert_eq!(used, 0);
+    }
+
+    #[test]
+    fn test_pcie_rate_calculation() {
+        // Test PCIe rate calculation with known values
+        let current_rx: u64 = 1_000_000_000; // 1 GB
+        let current_tx: u64 = 500_000_000;   // 0.5 GB
+        let prev_rx: u64 = 0;
+        let prev_tx: u64 = 0;
+        let time_ns: u64 = 1_000_000_000;    // 1 second in ns
+        let prev_time_ns: u64 = 0;
+
+        let (rx_rate, tx_rate) = calculate_pcie_rate(
+            current_rx, current_tx, prev_rx, prev_tx, time_ns, prev_time_ns
+        );
+
+        // Should be 1 GB/s and 0.5 GB/s
+        assert!((rx_rate - 1_000_000_000.0).abs() < 1.0);
+        assert!((tx_rate - 500_000_000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_pcie_rate_zero_delta() {
+        // Test PCIe rate calculation when time delta is zero
+        let (rx_rate, tx_rate) = calculate_pcie_rate(100, 200, 50, 100, 1000, 1000);
+        assert_eq!(rx_rate, 0.0);
+        assert_eq!(tx_rate, 0.0);
     }
 }

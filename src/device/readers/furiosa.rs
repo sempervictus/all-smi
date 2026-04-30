@@ -516,8 +516,14 @@ fn create_gpu_info_from_cli_cached(
           gsp_firmware_mode: None,
           gsp_firmware_version: None,
           nvlink_remote_devices: Vec::new(),
-          gpm_metrics: None,
-      })
+           gpm_metrics: None,
+           // PCIe rate fields - not available for Furiosa via furiosa-smi
+           pcie_rx_bytes: None,
+           pcie_tx_bytes: None,
+           pcie_rx_rate_bps: None,
+           pcie_tx_rate_bps: None,
+           pcie_sample_time_ns: None,
+       })
 }
 
 /// Extract the first device name from an RNGD ps dev_name string.
@@ -614,8 +620,14 @@ fn create_gpu_info_from_device_2025_cached(
           gsp_firmware_mode: None,
           gsp_firmware_version: None,
           nvlink_remote_devices: Vec::new(),
-          gpm_metrics: None,
-      })
+           gpm_metrics: None,
+           // PCIe rate fields - not available for Furiosa via furiosa-smi
+           pcie_rx_bytes: None,
+           pcie_tx_bytes: None,
+           pcie_rx_rate_bps: None,
+           pcie_tx_rate_bps: None,
+           pcie_sample_time_ns: None,
+       })
 }
 
 #[cfg(all(target_os = "linux", feature = "furiosa-smi-rs"))]
@@ -694,8 +706,14 @@ fn create_gpu_info_from_device_2025(
           gsp_firmware_mode: None,
           gsp_firmware_version: None,
           nvlink_remote_devices: Vec::new(),
-          gpm_metrics: None,
-      })
+           gpm_metrics: None,
+           // PCIe rate fields - not available for Furiosa via furiosa-smi
+           pcie_rx_bytes: None,
+           pcie_tx_bytes: None,
+           pcie_rx_rate_bps: None,
+           pcie_tx_rate_bps: None,
+           pcie_sample_time_ns: None,
+       })
 }
 
 fn create_process_info_from_ps(proc: &FuriosaPsOutputJson) -> ProcessInfo {

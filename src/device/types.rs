@@ -89,6 +89,16 @@ pub struct GpuInfo {
     pub nvlink_remote_devices: Vec<String>,
     /// GPM metrics - queried from NVML
     pub gpm_metrics: Option<HashMap<String, f64>>,
+    /// PCIe RX bytes (cumulative counter from NVML)
+    pub pcie_rx_bytes: Option<u64>,
+    /// PCIe TX bytes (cumulative counter from NVML)
+    pub pcie_tx_bytes: Option<u64>,
+    /// PCIe RX rate in bytes per second (calculated from delta)
+    pub pcie_rx_rate_bps: Option<f64>,
+    /// PCIe TX rate in bytes per second (calculated from delta)
+    pub pcie_tx_rate_bps: Option<f64>,
+    /// Timestamp of last PCIe sample for rate calculation
+    pub pcie_sample_time_ns: Option<u64>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
