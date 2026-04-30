@@ -208,48 +208,54 @@ impl NvidiaGpuReader {
                              .unwrap_or(0.0),
                          gpu_core_count: None,
                          detail,
-                         // New fields populated from NVML
-                         pci_bus_id: device.pci_info().map(|p| p.bus_id).unwrap_or_default(),
-                         thermal_threshold_shutdown_c: device
-                             .temperature_threshold(
-                                 nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Shutdown,
-                             )
-                             .unwrap_or(100),
-                         thermal_threshold_slowdown_c: device
-                             .temperature_threshold(
-                                 nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Slowdown,
-                             )
-                             .unwrap_or(85),
-                         power_limit_w: device
-                             .power_management_limit()
-                             .map(|p| p as f64 / 1000.0)
-                             .unwrap_or(0.0),
-                         power_limit_default_w: device
-                             .power_management_limit_default()
-                             .map(|p| p as f64 / 1000.0)
-                             .unwrap_or(0.0),
-                         pcie_max_gen: device.max_pcie_link_gen().unwrap_or(0),
-                         pcie_max_width: device.max_pcie_link_width().unwrap_or(0),
-                         sm_count: device.attributes().map(|a| a.multiprocessor_count).unwrap_or(0),
-                         warp_size: 32, // Hardware constant for NVIDIA GPUs
-                         memory_bus_width_bits: device.memory_bus_width().unwrap_or(0),
-                         memory_bandwidth_bytes_per_second: device
-                              .memory_bus_width()
+                         // New fields populated from NVML (as Options)
+                          pci_bus_id: device.pci_info().ok().map(|p| p.bus_id),
+                          thermal_threshold_shutdown_c: device
+                              .temperature_threshold(
+                                  nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Shutdown,
+                              )
+                              .ok(),
+                          thermal_threshold_slowdown_c: device
+                              .temperature_threshold(
+                                  nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Slowdown,
+                              )
+                              .ok(),
+                          power_limit_w: device
+                              .power_management_limit()
                               .ok()
-                              .and_then(|bus_width| {
-                                  device.clock(
-                                      nvml_wrapper::enum_wrappers::device::Clock::Memory,
-                                      nvml_wrapper::enum_wrappers::device::ClockId::Current,
-                                  )
-                                  .ok()
-                                  .map(|mem_clock| {
-                                      (bus_width as u64) * (mem_clock as u64) * 2 / 8
-                                  })
-                              })
-                              .map(|bw| bw as f64)
-                              .unwrap_or(0.0),
-                     };
-                    gpu_info.push(info);
+                              .map(|p| p as f64 / 1000.0),
+                          power_limit_default_w: device
+                              .power_management_limit_default()
+                              .ok()
+                              .map(|p| p as f64 / 1000.0),
+                          pcie_max_gen: device.max_pcie_link_gen().ok(),
+                          pcie_max_width: device.max_pcie_link_width().ok(),
+                          sm_count: device.attributes().ok().map(|a| a.multiprocessor_count),
+                          warp_size: Some(32), // Hardware constant for NVIDIA GPUs
+                          memory_bus_width_bits: device.memory_bus_width().ok(),
+                          memory_bandwidth_bytes_per_second: device
+                                .memory_bus_width()
+                                .ok()
+                                .and_then(|bus_width| {
+                                    device.clock(
+                                        nvml_wrapper::enum_wrappers::device::Clock::Memory,
+                                        nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                                    )
+                                    .ok()
+                                    .map(|mem_clock| {
+                                        ((bus_width as u64) * (mem_clock as u64) * 2 / 8) as f64
+                                    })
+                                }),
+                          temperature_threshold_max_operating_c: None,
+                          temperature_threshold_acoustic_c: None,
+                          performance_state: None,
+                          numa_node_id: None,
+                          gsp_firmware_mode: None,
+                          gsp_firmware_version: None,
+                          nvlink_remote_devices: Vec::new(),
+                          gpm_metrics: None,
+                      };
+                     gpu_info.push(info);
                 }
             }
         }
@@ -805,19 +811,27 @@ fn get_gpu_info_nvidia_smi() -> Vec<GpuInfo> {
                          / 1000.0,
                      gpu_core_count: None,
                      detail,
-                     // New fields - nvidia-smi fallback provides defaults
-                     pci_bus_id: format!("0000:{:02x}:00.0", idx),
-                     thermal_threshold_shutdown_c: 100,
-                     thermal_threshold_slowdown_c: 85,
-                     power_limit_w: 350.0,
-                     power_limit_default_w: 350.0,
-                     pcie_max_gen: 4,
-                     pcie_max_width: 16,
-                     sm_count: 0,
-                     warp_size: 32,
-                     memory_bus_width_bits: 0,
-                     memory_bandwidth_bytes_per_second: 0.0,
-                 })
+                     // New fields - nvidia-smi fallback provides defaults (as Options)
+                       pci_bus_id: None,
+                       thermal_threshold_shutdown_c: Some(100),
+                       thermal_threshold_slowdown_c: Some(85),
+                       power_limit_w: Some(350.0),
+                       power_limit_default_w: Some(350.0),
+                       pcie_max_gen: Some(4),
+                       pcie_max_width: Some(16),
+                       sm_count: Some(0),
+                       warp_size: Some(32),
+                       memory_bus_width_bits: Some(0),
+                       memory_bandwidth_bytes_per_second: Some(0.0),
+                        temperature_threshold_max_operating_c: None,
+                        temperature_threshold_acoustic_c: None,
+                        performance_state: None,
+                        numa_node_id: None,
+                        gsp_firmware_mode: None,
+                        gsp_firmware_version: None,
+                        nvlink_remote_devices: Vec::new(),
+                        gpm_metrics: None,
+                    })
             } else {
                 None
             }

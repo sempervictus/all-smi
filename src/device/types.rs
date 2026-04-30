@@ -52,27 +52,43 @@ pub struct GpuInfo {
     pub gpu_core_count: Option<u32>, // Number of GPU cores (e.g., Apple Silicon)
     pub detail: HashMap<String, String>,
     /// PCI bus ID (e.g., "0000:03:00.0") - queried from NVML
-    pub pci_bus_id: String,
+    pub pci_bus_id: Option<String>,
     /// Thermal threshold for shutdown in Celsius - queried from NVML
-    pub thermal_threshold_shutdown_c: u32,
+    pub thermal_threshold_shutdown_c: Option<u32>,
     /// Thermal threshold for slowdown in Celsius - queried from NVML
-    pub thermal_threshold_slowdown_c: u32,
+    pub thermal_threshold_slowdown_c: Option<u32>,
     /// Power limit in watts - queried from NVML
-    pub power_limit_w: f64,
+    pub power_limit_w: Option<f64>,
     /// Power limit default in watts - queried from NVML
-    pub power_limit_default_w: f64,
+    pub power_limit_default_w: Option<f64>,
     /// PCIe generation (max) - queried from NVML
-    pub pcie_max_gen: u32,
+    pub pcie_max_gen: Option<u32>,
     /// PCIe width (max) - queried from NVML
-    pub pcie_max_width: u32,
+    pub pcie_max_width: Option<u32>,
     /// SM count (multiprocessor count) - queried from NVML
-    pub sm_count: u32,
+    pub sm_count: Option<u32>,
     /// Warp size (hardware constant)
-    pub warp_size: u32,
+    pub warp_size: Option<u32>,
     /// Memory bus width in bits - queried from NVML
-    pub memory_bus_width_bits: u32,
+    pub memory_bus_width_bits: Option<u32>,
     /// Memory bandwidth in bytes per second - calculated from NVML
-    pub memory_bandwidth_bytes_per_second: f64,
+    pub memory_bandwidth_bytes_per_second: Option<f64>,
+    /// Thermal threshold for max operating temperature in Celsius - queried from NVML
+    pub temperature_threshold_max_operating_c: Option<u32>,
+    /// Thermal threshold for acoustic (noise) temperature in Celsius - queried from NVML
+    pub temperature_threshold_acoustic_c: Option<u32>,
+    /// Performance state (0=P0 fastest, 15=P15 idlest) - queried from NVML
+    pub performance_state: Option<u32>,
+    /// NUMA node ID - queried from NVML
+    pub numa_node_id: Option<i32>,
+    /// GSP firmware mode - queried from NVML
+    pub gsp_firmware_mode: Option<String>,
+    /// GSP firmware version - queried from NVML
+    pub gsp_firmware_version: Option<String>,
+    /// NVLink remote devices - queried from NVML
+    pub nvlink_remote_devices: Vec<String>,
+    /// GPM metrics - queried from NVML
+    pub gpm_metrics: Option<HashMap<String, f64>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
