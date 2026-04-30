@@ -51,6 +51,28 @@ pub struct GpuInfo {
     pub power_consumption: f64,
     pub gpu_core_count: Option<u32>, // Number of GPU cores (e.g., Apple Silicon)
     pub detail: HashMap<String, String>,
+    /// PCI bus ID (e.g., "0000:03:00.0") - queried from NVML
+    pub pci_bus_id: String,
+    /// Thermal threshold for shutdown in Celsius - queried from NVML
+    pub thermal_threshold_shutdown_c: u32,
+    /// Thermal threshold for slowdown in Celsius - queried from NVML
+    pub thermal_threshold_slowdown_c: u32,
+    /// Power limit in watts - queried from NVML
+    pub power_limit_w: f64,
+    /// Power limit default in watts - queried from NVML
+    pub power_limit_default_w: f64,
+    /// PCIe generation (max) - queried from NVML
+    pub pcie_max_gen: u32,
+    /// PCIe width (max) - queried from NVML
+    pub pcie_max_width: u32,
+    /// SM count (multiprocessor count) - queried from NVML
+    pub sm_count: u32,
+    /// Warp size (hardware constant)
+    pub warp_size: u32,
+    /// Memory bus width in bits - queried from NVML
+    pub memory_bus_width_bits: u32,
+    /// Memory bandwidth in bytes per second - calculated from NVML
+    pub memory_bandwidth_bytes_per_second: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

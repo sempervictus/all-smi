@@ -175,40 +175,79 @@ impl NvidiaGpuReader {
                     };
 
                     let info = GpuInfo {
-                        uuid: device.uuid().unwrap_or_else(|_| format!("GPU-{i}")),
-                        time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                        name: device.name().unwrap_or_else(|_| "Unknown GPU".to_string()),
-                        device_type: "GPU".to_string(),
-                        host_id: get_hostname(),
-                        hostname: get_hostname(),
-                        instance: get_hostname(),
-                        utilization: device
-                            .utilization_rates()
-                            .map(|u| u.gpu as f64)
-                            .unwrap_or(0.0),
-                        ane_utilization: 0.0,
-                        dla_utilization: None,
-                        tensorcore_utilization: None,
-                        temperature: device
-                            .temperature(
-                                nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu,
-                            )
-                            .unwrap_or(0),
-                        used_memory,
-                        total_memory,
-                        frequency: device
-                            .clock(
-                                nvml_wrapper::enum_wrappers::device::Clock::Graphics,
-                                nvml_wrapper::enum_wrappers::device::ClockId::Current,
-                            )
-                            .unwrap_or(0),
-                        power_consumption: device
-                            .power_usage()
-                            .map(|p| p as f64 / 1000.0)
-                            .unwrap_or(0.0),
-                        gpu_core_count: None,
-                        detail,
-                    };
+                         uuid: device.uuid().unwrap_or_else(|_| format!("GPU-{i}")),
+                         time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                         name: device.name().unwrap_or_else(|_| "Unknown GPU".to_string()),
+                         device_type: "GPU".to_string(),
+                         host_id: get_hostname(),
+                         hostname: get_hostname(),
+                         instance: get_hostname(),
+                         utilization: device
+                             .utilization_rates()
+                             .map(|u| u.gpu as f64)
+                             .unwrap_or(0.0),
+                         ane_utilization: 0.0,
+                         dla_utilization: None,
+                         tensorcore_utilization: None,
+                         temperature: device
+                             .temperature(
+                                 nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu,
+                             )
+                             .unwrap_or(0),
+                         used_memory,
+                         total_memory,
+                         frequency: device
+                             .clock(
+                                 nvml_wrapper::enum_wrappers::device::Clock::Graphics,
+                                 nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                             )
+                             .unwrap_or(0),
+                         power_consumption: device
+                             .power_usage()
+                             .map(|p| p as f64 / 1000.0)
+                             .unwrap_or(0.0),
+                         gpu_core_count: None,
+                         detail,
+                         // New fields populated from NVML
+                         pci_bus_id: device.pci_info().map(|p| p.bus_id).unwrap_or_default(),
+                         thermal_threshold_shutdown_c: device
+                             .temperature_threshold(
+                                 nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Shutdown,
+                             )
+                             .unwrap_or(100),
+                         thermal_threshold_slowdown_c: device
+                             .temperature_threshold(
+                                 nvml_wrapper::enum_wrappers::device::TemperatureThreshold::Slowdown,
+                             )
+                             .unwrap_or(85),
+                         power_limit_w: device
+                             .power_management_limit()
+                             .map(|p| p as f64 / 1000.0)
+                             .unwrap_or(0.0),
+                         power_limit_default_w: device
+                             .power_management_limit_default()
+                             .map(|p| p as f64 / 1000.0)
+                             .unwrap_or(0.0),
+                         pcie_max_gen: device.max_pcie_link_gen().unwrap_or(0),
+                         pcie_max_width: device.max_pcie_link_width().unwrap_or(0),
+                         sm_count: device.attributes().map(|a| a.multiprocessor_count).unwrap_or(0),
+                         warp_size: 32, // Hardware constant for NVIDIA GPUs
+                         memory_bus_width_bits: device.memory_bus_width().unwrap_or(0),
+                         memory_bandwidth_bytes_per_second: device
+                             .memory_bus_width()
+                             .ok()
+                             .and_then(|bus_width| {
+                                 device.clock(
+                                     nvml_wrapper::enum_wrappers::device::Clock::Memory,
+                                     nvml_wrapper::enum_wrappers::device::ClockId::Current,
+                                 )
+                                 .ok()
+                                 .map(|mem_clock| {
+                                     (bus_width as u64) * (mem_clock as u64) * 2 / 8
+                                 })
+                             })
+                             .unwrap_or(0),
+                     };
                     gpu_info.push(info);
                 }
             }
